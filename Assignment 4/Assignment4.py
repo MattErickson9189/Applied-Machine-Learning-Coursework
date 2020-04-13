@@ -13,12 +13,19 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_array
 from sklearn.preprocessing import LabelEncoder
 from scipy import sparse
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
 
 DOWNLOAD_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/00381/PRSA_data_2010.1.1-2014.12.31.csv"
 DATASET_BASE_PATH = './datasets/PM25DataSet/'
 DESTINATION_PATH =  DATASET_BASE_PATH + 'original_data_set.csv'
 
-
+#Downloads the data from a URL
 def fetch_data(fetchUrl):
 
     #make any parent directories if needed
@@ -26,11 +33,13 @@ def fetch_data(fetchUrl):
     os.makedirs(DESTINATION_PATH[:index], exist_ok=True)
 
     urllib.request.urlretrieve(fetchUrl, DESTINATION_PATH)
-  
+ 
+# Loads in data from a csv and returns the dataFrame
 def load_data(dataSet):
     pm25DF = pd.read_csv(dataSet)
     return pm25DF
 
+#Function takes in a dataFrame and a list of features and removes all the features and na rows
 def remove_features(dataSet, features):
     for feature in features:
         dataSet = dataSet.drop(feature, axis=1)
@@ -38,6 +47,7 @@ def remove_features(dataSet, features):
     return dataSet
 
 
+#Class to combine the Is and Ir features
 class CombineAttributes(BaseEstimator, TransformerMixin):
 
     def __init__(self):
@@ -79,6 +89,8 @@ pm25DF = remove_features(pm25DF, features_to_drop)
 print(pm25DF.info())
 print()
 
+# Preprocessing pipeline
+
 num_pipeline = Pipeline([
     ('selector', DataFrameSelector(numeric_feature_names)),
     ('attribs_adder', CombineAttributes()),
@@ -106,6 +118,8 @@ print(pm25DF_Processed.shape)
 print(pm25DF_Processed[0,:])
 print()
 
+# Splitting the data into train and test sections
+
 train_set, test_set = train_test_split(pm25DF_Processed, test_size=.2, random_state=10)
 print(train_set.shape)
 print(test_set.shape)
@@ -115,3 +129,70 @@ pickle_path = os.path.join(DATASET_BASE_PATH, "mp25.pickle")
 with open(pickle_path, 'wb') as f:
     pickle.dump([train_set,test_set],f)
 
+
+# Experimenting with different models
+
+
+#TODO Slice out 1 column and put it into the y_train and y_test
+"""
+x_train = train_set[:,:-1]
+y_train = train_set[:,-1:]
+x_test = test_set[:,:-1]
+y_test = test_set[:,-1:]
+"""
+
+
+print()
+print(x_train.shape)
+print(x_test.shape)
+print(y_train.shape)
+print(y_test.shape)
+
+#Create polynomial features from train set
+poly_features = PolynomialFeatures(degree=2, include_bias=False)
+x_train_poly = poly_features.fit_transform(x_train)
+
+linear_reg = LinearRegression()
+elastic_net = ElasticNet(alpha=0.1, l1_ratio=0.5, max_iter=1000)
+tree_reg = DecisionTreeRegressor()
+forest_reg = RandomForestRegressor()
+
+print("\nTraining Models...")
+
+print("Training Linear Model")
+linear_scores = cross_val_score(linear_reg, x_train, y_train, scoring="neg_mean_squared_error", cv=10)
+print("Done Training Linear Model")
+
+print("Training Elastic Net Model")
+elastic_scores = cross_val_score(elastic_net, x_train_poly, y_train, scoring="neg_mean_squared_error", cv=10)
+print("Done Training Elastic Net Model")
+
+print("Training Decision Tree Model")
+tree_scores = cross_val_score(tree_reg, x_train, y_train, scoring="neg_mean_squared_error", cv=10)
+print("Done Training Decision Tree Model")
+
+print("Training Random Forest Model")
+forest_scores = cross_val_score(forest_reg, x_train, y_train, scoring="neg_mean_squared_error", cv=10)
+print("Done Training Randome Forest Model")
+
+#Calculate the average RMSE and make it positive
+
+target_range = y_train.max()-y_train.min()
+linear_average_rmse = np.sqrt(-linear_scores).mean()/target_range
+elastic_average_rmse = np.sqrt(-elastic_scores).mean()/target_range
+tree_average_rmse = np.sqrt(-tree_scores).mean()/target_range
+forest_average_rmse = np.sqrt(-forest_scores).mean()/target_range
+
+#Plot the RMSE
+print("\nPlotting Average RMSEs...")
+x = [1,2,3,4]
+
+model_names = ["Linear", "ElasticNet", "Decision Tree", "Random Forest"]
+average_rmses = [linear_average_rmse, elastic_average_rmse, tree_average_rmse, forest_average_rmse]
+print(['{:.2%}'.format(item) for item in average_rmses])
+
+plt.figure(figsize=(10,5))
+plt.bar(x,average_rmses)
+plt.xticks(x,model_names)
+plt.ylim(ymax=0.1)
+plt.show()
