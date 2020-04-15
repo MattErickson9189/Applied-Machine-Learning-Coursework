@@ -20,6 +20,8 @@ from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
+from sklearn.svm import SVR
+from sklearn.ensemble import GradientBoostingRegressor
 
 DOWNLOAD_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/00381/PRSA_data_2010.1.1-2014.12.31.csv"
 DATASET_BASE_PATH = './datasets/PM25DataSet/'
@@ -58,6 +60,8 @@ class CombineAttributes(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, x, y=None):
+        print("\nInside CombineAttributes")
+        print(x[:3,:])
         total_hours_rain_and_snow = (x[:, self.Is_ix] + x[:,self.Ir_ix]).reshape(-1,1)
         return np.hstack([x, total_hours_rain_and_snow])
 
@@ -88,6 +92,7 @@ pm25DF = remove_features(pm25DF, features_to_drop)
 
 print(pm25DF.info())
 print()
+print(pm25DF.head())
 
 # Preprocessing pipeline
 
@@ -114,8 +119,10 @@ full_pipeline = FeatureUnion(transformer_list=[
 
 pm25DF_Processed = full_pipeline.fit_transform(pm25DF)
 
+print("\nAfter")
+print(pm25DF_Processed[:3,:])
+
 print(pm25DF_Processed.shape)
-print(pm25DF_Processed[0,:])
 print()
 
 # Splitting the data into train and test sections
@@ -134,13 +141,19 @@ with open(pickle_path, 'wb') as f:
 
 
 #TODO Slice out 1 column and put it into the y_train and y_test
-"""
 x_train = train_set[:,:-1]
 y_train = train_set[:,-1:]
 x_test = test_set[:,:-1]
 y_test = test_set[:,-1:]
-"""
 
+'''
+x_train = train_set[:,1:]
+y_train = train_set[:,:1]
+x_test = test_set[:,1:]
+y_test = test_set[:,:1]
+'''
+#y_train = np.reshape(y_train, (-1,1))
+#y_test = np.reshape(y_test, (-1,1))
 
 print()
 print(x_train.shape)
@@ -156,6 +169,8 @@ linear_reg = LinearRegression()
 elastic_net = ElasticNet(alpha=0.1, l1_ratio=0.5, max_iter=1000)
 tree_reg = DecisionTreeRegressor()
 forest_reg = RandomForestRegressor()
+svr_reg = SVR()
+gradient_boost_reg = GradientBoostingRegressor()
 
 print("\nTraining Models...")
 
@@ -175,6 +190,15 @@ print("Training Random Forest Model")
 forest_scores = cross_val_score(forest_reg, x_train, y_train, scoring="neg_mean_squared_error", cv=10)
 print("Done Training Randome Forest Model")
 
+print("Training SVR Model")
+svr_scores = cross_val_score(svr_reg, x_train, y_train, scoring="neg_mean_squared_error", cv=10)
+print("Done Training SVR Model")
+
+print("Training Gradient Boosting Model")
+gradient_boost_scores = cross_val_score(gradient_boost_reg, x_train, y_train, scoring="neg_mean_squared_error", cv=10)
+print("Done Training Gradient Boosting Model")
+
+
 #Calculate the average RMSE and make it positive
 
 target_range = y_train.max()-y_train.min()
@@ -182,13 +206,15 @@ linear_average_rmse = np.sqrt(-linear_scores).mean()/target_range
 elastic_average_rmse = np.sqrt(-elastic_scores).mean()/target_range
 tree_average_rmse = np.sqrt(-tree_scores).mean()/target_range
 forest_average_rmse = np.sqrt(-forest_scores).mean()/target_range
+svr_average_rmse = np.sqrt(-svr_scores).mean()/target_range
+gradient_boost_average_rmse = np.sqrt(-gradient_boost_scores).mean()/target_range
 
 #Plot the RMSE
 print("\nPlotting Average RMSEs...")
-x = [1,2,3,4]
+x = [1,2,3,4,5,6]
 
-model_names = ["Linear", "ElasticNet", "Decision Tree", "Random Forest"]
-average_rmses = [linear_average_rmse, elastic_average_rmse, tree_average_rmse, forest_average_rmse]
+model_names = ["Linear", "ElasticNet", "Decision Tree", "Random Forest", "SVR", "Gradient Boosting"]
+average_rmses = [linear_average_rmse, elastic_average_rmse, tree_average_rmse, forest_average_rmse, svr_average_rmse, gradient_boost_average_rmse]
 print(['{:.2%}'.format(item) for item in average_rmses])
 
 plt.figure(figsize=(10,5))
