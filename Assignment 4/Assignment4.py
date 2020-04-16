@@ -1,3 +1,4 @@
+import sys
 import os
 from six.moves import urllib
 import pandas as pd
@@ -26,6 +27,8 @@ from sklearn.ensemble import GradientBoostingRegressor
 DOWNLOAD_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/00381/PRSA_data_2010.1.1-2014.12.31.csv"
 DATASET_BASE_PATH = './datasets/PM25DataSet/'
 DESTINATION_PATH =  DATASET_BASE_PATH + 'original_data_set.csv'
+
+np.set_printoptions(suppress=True)
 
 #Downloads the data from a URL
 def fetch_data(fetchUrl):
@@ -82,11 +85,11 @@ fetch_data(DOWNLOAD_URL)
 
 pm25DF = load_data(DESTINATION_PATH)
 
-numeric_feature_names = ["DEWP", "TEMP", "PRES", "Iws", "Is", "Ir"]
+numeric_feature_names = ["month", "day", "hour", "DEWP", "TEMP", "PRES", "Iws", "Is", "Ir"]
 categorical_feature_names = ["cbwd"]
 target_variable = ["pm2.5"]
 
-features_to_drop = ["No", "year", "month", "day", "hour"]
+features_to_drop = ["No", "year"]
 
 pm25DF = remove_features(pm25DF, features_to_drop)
 
@@ -119,12 +122,6 @@ full_pipeline = FeatureUnion(transformer_list=[
 
 pm25DF_Processed = full_pipeline.fit_transform(pm25DF)
 
-print("\nAfter")
-print(pm25DF_Processed[:3,:])
-
-print(pm25DF_Processed.shape)
-print()
-
 # Splitting the data into train and test sections
 
 train_set, test_set = train_test_split(pm25DF_Processed, test_size=.2, random_state=10)
@@ -145,15 +142,35 @@ x_train = train_set[:,:-1]
 y_train = train_set[:,-1:]
 x_test = test_set[:,:-1]
 y_test = test_set[:,-1:]
-
 '''
 x_train = train_set[:,1:]
 y_train = train_set[:,:1]
 x_test = test_set[:,1:]
 y_test = test_set[:,:1]
 '''
-#y_train = np.reshape(y_train, (-1,1))
-#y_test = np.reshape(y_test, (-1,1))
+
+print("\nTrain Set\n")
+print(train_set[:5,:])
+
+'''
+x_train = train_set[:,:3]
+x_train = np.hstack([x_train, train_set[:,4:]])
+y_train = train_set[:,3]
+x_test = test_set[:,:3]
+x_test = np.hstack([x_test, test_set[:,4:]])
+y_test = test_set[:,3]
+
+y_train = np.reshape(y_train, (-1,1))
+y_test = np.reshape(y_test, (-1,1))
+'''
+print()
+print("\nx_train\n")
+print(x_train[:5,:])
+print()
+print("\ny_train\n")
+print(y_train[:5,:])
+print()
+
 
 print()
 print(x_train.shape)
@@ -190,14 +207,13 @@ print("Training Random Forest Model")
 forest_scores = cross_val_score(forest_reg, x_train, y_train, scoring="neg_mean_squared_error", cv=10)
 print("Done Training Randome Forest Model")
 
-print("Training SVR Model")
-svr_scores = cross_val_score(svr_reg, x_train, y_train, scoring="neg_mean_squared_error", cv=10)
-print("Done Training SVR Model")
-
 print("Training Gradient Boosting Model")
 gradient_boost_scores = cross_val_score(gradient_boost_reg, x_train, y_train, scoring="neg_mean_squared_error", cv=10)
 print("Done Training Gradient Boosting Model")
 
+print("Training SVR Model")
+svr_scores = cross_val_score(svr_reg, x_train, y_train, scoring="neg_mean_squared_error", cv=10)
+print("Done Training SVR Model")
 
 #Calculate the average RMSE and make it positive
 
@@ -213,8 +229,8 @@ gradient_boost_average_rmse = np.sqrt(-gradient_boost_scores).mean()/target_rang
 print("\nPlotting Average RMSEs...")
 x = [1,2,3,4,5,6]
 
-model_names = ["Linear", "ElasticNet", "Decision Tree", "Random Forest", "SVR", "Gradient Boosting"]
-average_rmses = [linear_average_rmse, elastic_average_rmse, tree_average_rmse, forest_average_rmse, svr_average_rmse, gradient_boost_average_rmse]
+model_names = ["Linear", "ElasticNet", "Decision Tree", "Random Forest", "Gradient Boosting", "SVR"]
+average_rmses = [linear_average_rmse, elastic_average_rmse, tree_average_rmse, forest_average_rmse, gradient_boost_average_rmse, svr_average_rmse]
 print(['{:.2%}'.format(item) for item in average_rmses])
 
 plt.figure(figsize=(10,5))
