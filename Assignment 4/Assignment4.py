@@ -23,6 +23,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.svm import SVR
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.model_selection import GridSearchCV
+
 
 DOWNLOAD_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/00381/PRSA_data_2010.1.1-2014.12.31.csv"
 DATASET_BASE_PATH = './datasets/PM25DataSet/'
@@ -63,8 +65,6 @@ class CombineAttributes(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, x, y=None):
-        print("\nInside CombineAttributes")
-        print(x[:3,:])
         total_hours_rain_and_snow = (x[:, self.Is_ix] + x[:,self.Ir_ix]).reshape(-1,1)
         return np.hstack([x, total_hours_rain_and_snow])
 
@@ -142,33 +142,15 @@ x_train = train_set[:,:-1]
 y_train = train_set[:,-1:]
 x_test = test_set[:,:-1]
 y_test = test_set[:,-1:]
-'''
-x_train = train_set[:,1:]
-y_train = train_set[:,:1]
-x_test = test_set[:,1:]
-y_test = test_set[:,:1]
-'''
 
 print("\nTrain Set\n")
-print(train_set[:5,:])
-
-'''
-x_train = train_set[:,:3]
-x_train = np.hstack([x_train, train_set[:,4:]])
-y_train = train_set[:,3]
-x_test = test_set[:,:3]
-x_test = np.hstack([x_test, test_set[:,4:]])
-y_test = test_set[:,3]
-
-y_train = np.reshape(y_train, (-1,1))
-y_test = np.reshape(y_test, (-1,1))
-'''
+print(train_set[:3,:])
 print()
 print("\nx_train\n")
-print(x_train[:5,:])
+print(x_train[:3,:])
 print()
 print("\ny_train\n")
-print(y_train[:5,:])
+print(y_train[:3,:])
 print()
 
 
@@ -236,5 +218,26 @@ print(['{:.2%}'.format(item) for item in average_rmses])
 plt.figure(figsize=(10,5))
 plt.bar(x,average_rmses)
 plt.xticks(x,model_names)
-plt.ylim(ymax=0.1)
+plt.ylim(ymax=0.08)
 plt.show()
+
+print("\nTuning Hyperparameters...\n")
+
+param_grid = [
+        {'n_estimators': [5,10,15,20], 'min_samples_split':[2,4,6,10]}
+        ]
+
+forest_reg = RandomForestRegressor()
+grid_search = GridSearchCV(forest_reg, param_grid, cv=10, scoring='neg_mean_squared_error')
+grid_search.fit(x_train, np.squeeze(y_train))
+print(grid_search.best_params_)
+
+final_model = grid_search.best_estimator_
+final_predictions = final_model.predict(x_test)
+final_mse = mean_squared_error(y_test, final_predictions)
+final_rmse = np.sqrt(final_mse)
+final_normalized_rmse = final_rmse/target_range
+
+print("RMSE: {0:.0f}".format(final_rmse))
+print("Normalized RMSE: {0:.2%}".format(final_normalized_rmse))
+
